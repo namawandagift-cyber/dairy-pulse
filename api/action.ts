@@ -22,9 +22,9 @@ export default async function handler(
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
-
-    const gasResponse = await fetch(url, {
+   const timeout = setTimeout(() => controller.abort(), 60000);
+  
+  const gasResponse = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
