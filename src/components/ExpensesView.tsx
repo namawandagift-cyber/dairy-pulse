@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Expense } from '../types';
 import { api } from '../services/api';
-import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
 
 const COMMON_CATEGORIES = [
   'Feed & Forage',
@@ -97,6 +97,12 @@ export const ExpensesView: React.FC = () => {
   };
 
   const totalExpenseAmount = expenses.reduce((sum, e) => sum + (parseFloat(String(e.amount)) || 0), 0);
+
+  const deleteExpense = async (id: string) => {
+    if (!window.confirm('Delete this expense record? This cannot be undone.')) return;
+    try { await api.deleteRecord('expense', id); setFeedback({ type: 'success', message: 'Expense deleted.' }); await fetchExpenses(); }
+    catch (err: any) { setFeedback({ type: 'error', message: err.message || 'Unable to delete expense.' }); }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10">
@@ -264,6 +270,7 @@ export const ExpensesView: React.FC = () => {
                   <th className="py-3 px-4">Amount</th>
                   <th className="py-3 px-4">Description</th>
                   <th className="py-3 px-4">Recorded By</th>
+                  <th className="py-3 px-4">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-stone-800">
@@ -280,6 +287,7 @@ export const ExpensesView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-stone-500 max-w-xs truncate">{e.description || '—'}</td>
                     <td className="py-3 px-4 text-stone-500 whitespace-nowrap">{e.recordedBy || '—'}</td>
+                    <td className="py-3 px-4"><button type="button" onClick={() => void deleteExpense(e.id)} aria-label="Delete expense" className="text-red-700"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>

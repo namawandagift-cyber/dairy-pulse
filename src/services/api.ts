@@ -1,5 +1,6 @@
 import {
   Buyer,
+  Cow,
   DashboardSummary,
   Expense,
   Farm,
@@ -176,6 +177,7 @@ class ApiService {
     morningLitres: number;
     eveningLitres: number;
     notes?: string;
+    cowId?: string;
   }): Promise<MilkRecord> {
     try {
       const res = await this.request<{ record: MilkRecord }>('createMilkRecord', params);
@@ -186,6 +188,20 @@ class ApiService {
       }
       throw new Error('Milk record could not be saved. Please try again.');
     }
+  }
+
+  async getCows(): Promise<Cow[]> {
+    const res = await this.request<{ cows: Cow[] }>('getCows');
+    return res.cows || [];
+  }
+
+  async createCow(params: { name: string; tag?: string; breed?: string }): Promise<Cow> {
+    const res = await this.request<{ cow: Cow }>('createCow', params);
+    return res.cow;
+  }
+
+  async deleteRecord(recordType: 'milk' | 'sale' | 'expense' | 'cow' | 'buyer', id: string): Promise<void> {
+    await this.request('deleteRecord', { recordType, id });
   }
 
   async getExpenses(): Promise<Expense[]> {

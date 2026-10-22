@@ -34,6 +34,16 @@ export interface MilkRecord {
   notes?: string;
   createdAt: string;
   updatedAt?: string;
+  cowId?: string;
+}
+
+export interface Cow {
+  id: string;
+  farmId: string;
+  name: string;
+  tag?: string;
+  breed?: string;
+  createdAt: string;
 }
 
 export interface Expense {
