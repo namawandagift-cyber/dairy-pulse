@@ -251,7 +251,7 @@ export const SalesView: React.FC = () => {
                 <label className="block text-xs font-bold text-stone-700 mb-1">Price per Litre (UGX)</label>
                 <input
                   type="number"
-                  step="50"
+                  step="1"
                   min="1"
                   required
                   placeholder="e.g. 1400"
