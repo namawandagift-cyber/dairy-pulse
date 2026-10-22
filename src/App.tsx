@@ -12,6 +12,7 @@ import { ExpensesView } from './components/ExpensesView';
 import { BuyersView } from './components/BuyersView';
 import { FarmTeamView } from './components/FarmTeamView';
 import { FarmSettingsView } from './components/FarmSettingsView';
+import { CowsView } from './components/CowsView';
 
 const MainApp: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -79,6 +80,7 @@ const MainApp: React.FC = () => {
         <main>
           {ownerTab === 'dashboard' && <OwnerDashboardView onNavigate={(tab) => setOwnerTab(tab)} />}
           {ownerTab === 'milk' && <MilkRecordsView />}
+          {ownerTab === 'cows' && <CowsView />}
           {ownerTab === 'sales' && <SalesView />}
           {ownerTab === 'expenses' && <ExpensesView />}
           {ownerTab === 'buyers' && <BuyersView />}

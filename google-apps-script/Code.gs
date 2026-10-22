@@ -2,7 +2,7 @@
  * DairyPulse V1 - Google Apps Script Backend
  * 
  * Google Sheets ONLY Persistence Layer
- * Sheets required: Users, Farms, MilkRecords, Expenses, Buyers, Sales, Sessions, Activity
+ * Sheets required: Users, Farms, MilkRecords, Cows, Expenses, Buyers, Sales, Sessions, Activity
  * 
  * Web App Deployment Settings:
  * 1. Click "Deploy" -> "New deployment"
@@ -18,7 +18,8 @@
 const SCHEMA = {
   Users: ['id', 'farmId', 'name', 'email', 'phone', 'passwordHash', 'role', 'status', 'createdAt', 'updatedAt'],
   Farms: ['id', 'name', 'location', 'phone', 'description', 'status', 'createdAt', 'createdBy'],
-  MilkRecords: ['id', 'farmId', 'recordedBy', 'date', 'morningLitres', 'eveningLitres', 'totalLitres', 'notes', 'createdAt', 'updatedAt'],
+  MilkRecords: ['id', 'farmId', 'recordedBy', 'date', 'morningLitres', 'eveningLitres', 'totalLitres', 'notes', 'createdAt', 'updatedAt', 'cowId'],
+  Cows: ['id', 'farmId', 'name', 'tag', 'breed', 'createdAt'],
   Expenses: ['id', 'farmId', 'date', 'category', 'amount', 'description', 'recordedBy', 'createdAt'],
   Buyers: ['id', 'farmId', 'name', 'phone', 'location', 'notes', 'createdAt'],
   Sales: ['id', 'farmId', 'buyerId', 'buyerName', 'date', 'quantityLitres', 'pricePerLitre', 'totalAmount', 'recordedBy', 'createdAt'],
@@ -119,6 +120,15 @@ function doPost(e) {
 
       case "createMilkRecord":
         return handleCreateMilkRecord(ss, payload);
+
+      case "getCows":
+        return handleGetCows(ss, payload);
+
+      case "createCow":
+        return handleCreateCow(ss, payload);
+
+      case "deleteRecord":
+        return handleDeleteRecord(ss, payload);
 
       case "getExpenses":
         return handleGetExpenses(ss, payload);
@@ -679,8 +689,12 @@ function handleCreateMilkRecord(ss, payload) {
 
     if (!date) return createJsonResponse({ success: false, error: "Date is required." });
 
-    const morning = parseFloat(morningLitres) || 0;
-    const evening = parseFloat(eveningLitres) || 0;
+    const morning = Number(morningLitres ?? 0);
+    const evening = Number(eveningLitres ?? 0);
+
+    if (!Number.isFinite(morning) || !Number.isFinite(evening)) {
+      return createJsonResponse({ success: false, error: "Enter a valid number of litres." });
+    }
 
     if (morning < 0 || evening < 0) {
       return createJsonResponse({ success: false, error: "Litres cannot be negative." });
@@ -688,6 +702,14 @@ function handleCreateMilkRecord(ss, payload) {
 
     if (morning === 0 && evening === 0) {
       return createJsonResponse({ success: false, error: "Please enter morning or evening litres (or both)." });
+    }
+
+    const cowId = String(payload.cowId || "");
+    if (cowId) {
+      const cows = getRowsAsObjects(getOrCreateSheet(ss, "Cows", SCHEMA.Cows), SCHEMA.Cows);
+      if (!cows.some(cow => cow.id === cowId && cow.farmId === auth.farm.id)) {
+        return createJsonResponse({ success: false, error: "Selected cow was not found." });
+      }
     }
 
     const total = Math.round((morning + evening) * 100) / 100;
@@ -704,7 +726,8 @@ function handleCreateMilkRecord(ss, payload) {
       totalLitres: total,
       notes: (notes || "").trim(),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      cowId: cowId
     };
 
     const milkSheet = getOrCreateSheet(ss, "MilkRecords", SCHEMA.MilkRecords);
@@ -717,6 +740,58 @@ function handleCreateMilkRecord(ss, payload) {
       message: "Milk record saved successfully.",
       record: record
     });
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.message });
+  }
+}
+
+function handleGetCows(ss, payload) {
+  try {
+    const auth = authenticateSession(ss, payload.token);
+    const cows = getRowsAsObjects(getOrCreateSheet(ss, "Cows", SCHEMA.Cows), SCHEMA.Cows)
+      .filter(cow => cow.farmId === auth.farm.id)
+      .map(cow => { const clean = { ...cow }; delete clean._rowNumber; return clean; });
+    return createJsonResponse({ success: true, cows: cows });
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.message });
+  }
+}
+
+function handleCreateCow(ss, payload) {
+  try {
+    const auth = authenticateSession(ss, payload.token, ["OWNER"]);
+    const name = String(payload.name || "").trim();
+    const tag = String(payload.tag || "").trim();
+    const breed = String(payload.breed || "").trim();
+    if (!name) return createJsonResponse({ success: false, error: "Cow name is required." });
+    const cow = { id: generateId("cow"), farmId: auth.farm.id, name: name, tag: tag, breed: breed, createdAt: new Date().toISOString() };
+    appendObjectAsRow(getOrCreateSheet(ss, "Cows", SCHEMA.Cows), SCHEMA.Cows, cow);
+    logActivity(ss, auth.farm.id, auth.user.id, "REGISTER_COW", { name: name, tag: tag });
+    return createJsonResponse({ success: true, cow: cow });
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.message });
+  }
+}
+
+function handleDeleteRecord(ss, payload) {
+  try {
+    const auth = authenticateSession(ss, payload.token);
+    const allowedSheets = { milk: "MilkRecords", sale: "Sales", expense: "Expenses", cow: "Cows", buyer: "Buyers" };
+    const sheetName = allowedSheets[payload.recordType];
+    if (!sheetName || !payload.id) return createJsonResponse({ success: false, error: "A valid record is required." });
+    if (auth.user.role !== "OWNER" && payload.recordType !== "milk") {
+      return createJsonResponse({ success: false, error: "Only farm owners can delete this record." });
+    }
+    const headers = SCHEMA[sheetName];
+    const sheet = getOrCreateSheet(ss, sheetName, headers);
+    const row = getRowsAsObjects(sheet, headers).find(item => item.id === payload.id && item.farmId === auth.farm.id);
+    if (!row) return createJsonResponse({ success: false, error: "Record not found." });
+    if (payload.recordType === "milk" && auth.user.role !== "OWNER" && row.recordedBy !== auth.user.name) {
+      return createJsonResponse({ success: false, error: "You can only delete your own milk records." });
+    }
+    sheet.deleteRow(row._rowNumber);
+    logActivity(ss, auth.farm.id, auth.user.id, "DELETE_RECORD", { recordType: payload.recordType, id: payload.id });
+    return createJsonResponse({ success: true });
   } catch (err) {
     return createJsonResponse({ success: false, error: err.message });
   }

@@ -17,6 +17,7 @@ DairyPulse uses Google Sheets as its sole database, connected through a Google A
    - `Sales`
    - `Sessions`
    - `Activity`
+   - `Cows`
 
 ---
 
@@ -59,7 +60,8 @@ Set the Web App URL in your DairyPulse environment:
 |---|---|
 | **Users** | `id`, `farmId`, `name`, `email`, `phone`, `passwordHash`, `role`, `status`, `createdAt`, `updatedAt` |
 | **Farms** | `id`, `name`, `location`, `phone`, `description`, `status`, `createdAt`, `createdBy` |
-| **MilkRecords** | `id`, `farmId`, `recordedBy`, `date`, `morningLitres`, `eveningLitres`, `totalLitres`, `notes`, `createdAt`, `updatedAt` |
+| **MilkRecords** | `id`, `farmId`, `recordedBy`, `date`, `morningLitres`, `eveningLitres`, `totalLitres`, `notes`, `createdAt`, `updatedAt`, `cowId` (optional) |
+| **Cows** | `id`, `farmId`, `name`, `tag`, `breed`, `createdAt` |
 | **Expenses** | `id`, `farmId`, `date`, `category`, `amount`, `description`, `recordedBy`, `createdAt` |
 | **Buyers** | `id`, `farmId`, `name`, `phone`, `location`, `notes`, `createdAt` |
 | **Sales** | `id`, `farmId`, `buyerId`, `buyerName`, `date`, `quantityLitres`, `pricePerLitre`, `totalAmount`, `recordedBy`, `createdAt` |

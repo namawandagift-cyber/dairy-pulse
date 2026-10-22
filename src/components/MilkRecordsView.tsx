@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { MilkRecord } from '../types';
 import { api } from '../services/api';
-import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { Cow } from '../types';
 
 export const MilkRecordsView: React.FC = () => {
   const [records, setRecords] = useState<MilkRecord[]>([]);
+  const [cows, setCows] = useState<Cow[]>([]);
+  const [cowId, setCowId] = useState('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
 
@@ -21,6 +24,7 @@ export const MilkRecordsView: React.FC = () => {
     try {
       const data = await api.getMilkRecords();
       setRecords(data);
+      setCows(await api.getCows());
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Unable to load milk records.' });
     } finally {
@@ -39,6 +43,11 @@ export const MilkRecordsView: React.FC = () => {
     const m = parseFloat(morningLitres) || 0;
     const ev = parseFloat(eveningLitres) || 0;
 
+    if (!Number.isFinite(m) || !Number.isFinite(ev)) {
+      setFeedback({ type: 'error', message: 'Please enter valid numbers for litres.' });
+      return;
+    }
+
     if (m === 0 && ev === 0) {
       setFeedback({ type: 'error', message: 'Please enter morning or evening litres (or both).' });
       return;
@@ -56,17 +65,30 @@ export const MilkRecordsView: React.FC = () => {
         morningLitres: m,
         eveningLitres: ev,
         notes: notes.trim(),
+        cowId: cowId || undefined,
       });
       setFeedback({ type: 'success', message: `Milk record saved (${saved.totalLitres} L).` });
       setMorningLitres('');
       setEveningLitres('');
       setNotes('');
+      setCowId('');
       setShowAddForm(false);
       await fetchRecords();
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Milk record could not be saved. Please try again.' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this milk record? This cannot be undone.')) return;
+    try {
+      await api.deleteRecord('milk', id);
+      setFeedback({ type: 'success', message: 'Milk record deleted.' });
+      await fetchRecords();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Unable to delete milk record.' });
     }
   };
 
@@ -143,6 +165,13 @@ export const MilkRecordsView: React.FC = () => {
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {cows.length > 0 && <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Cow (optional)</label>
+                <select value={cowId} onChange={(e) => setCowId(e.target.value)} className="w-full h-10 px-3 text-sm border border-stone-300 rounded bg-white">
+                  <option value="">Farm total / no cow</option>
+                  {cows.map(cow => <option key={cow.id} value={cow.id}>{cow.name}{cow.tag ? ` (${cow.tag})` : ''}</option>)}
+                </select>
+              </div>}
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1">Date</label>
                 <input
@@ -158,7 +187,7 @@ export const MilkRecordsView: React.FC = () => {
                 <label className="block text-xs font-bold text-stone-700 mb-1">Morning (Litres)</label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   min="0"
                   placeholder="0.0"
                   value={morningLitres}
@@ -171,7 +200,7 @@ export const MilkRecordsView: React.FC = () => {
                 <label className="block text-xs font-bold text-stone-700 mb-1">Evening (Litres)</label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   min="0"
                   placeholder="0.0"
                   value={eveningLitres}
@@ -231,6 +260,7 @@ export const MilkRecordsView: React.FC = () => {
                   <th className="py-3 px-4 text-[#1b4332]">Total</th>
                   <th className="py-3 px-4">Recorded By</th>
                   <th className="py-3 px-4">Notes</th>
+                  <th className="py-3 px-4">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-stone-800">
@@ -244,6 +274,7 @@ export const MilkRecordsView: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-stone-500 whitespace-nowrap">{r.recordedBy || '—'}</td>
                     <td className="py-3 px-4 text-stone-500 max-w-xs truncate">{r.notes || '—'}</td>
+                    <td className="py-3 px-4"><button type="button" onClick={() => handleDelete(r.id)} aria-label="Delete milk record" className="text-red-700 hover:text-red-900"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>

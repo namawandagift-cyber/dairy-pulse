@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { MilkRecord } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+import { Cow } from '../types';
 
 export const HerdsmanMilkForm: React.FC = () => {
   const { user, farm } = useAuth();
@@ -20,6 +21,8 @@ export const HerdsmanMilkForm: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [recentRecords, setRecentRecords] = useState<MilkRecord[]>([]);
+  const [cows, setCows] = useState<Cow[]>([]);
+  const [cowId, setCowId] = useState('');
   const [isLoadingRecords, setIsLoadingRecords] = useState<boolean>(true);
 
   // Load recent records
@@ -28,6 +31,7 @@ export const HerdsmanMilkForm: React.FC = () => {
       setIsLoadingRecords(true);
       const records = await api.getMilkRecords();
       setRecentRecords(records.slice(0, 10)); // recent 10 records
+      setCows(await api.getCows());
     } catch {
       // Non-fatal on background load
     } finally {
@@ -48,6 +52,11 @@ export const HerdsmanMilkForm: React.FC = () => {
     const m = parseFloat(morningLitres) || 0;
     const ev = parseFloat(eveningLitres) || 0;
 
+    if (!Number.isFinite(m) || !Number.isFinite(ev)) {
+      setErrorMessage('Please enter valid numbers for litres.');
+      return;
+    }
+
     if (m === 0 && ev === 0) {
       setErrorMessage('Please enter morning or evening litres (or both).');
       return;
@@ -66,18 +75,31 @@ export const HerdsmanMilkForm: React.FC = () => {
         morningLitres: m,
         eveningLitres: ev,
         notes: notes.trim(),
+        cowId: cowId || undefined,
       });
 
       setSuccessMessage(`Milk record saved. Total: ${savedRecord.totalLitres} L`);
       setMorningLitres('');
       setEveningLitres('');
       setNotes('');
+      setCowId('');
       // Reload recent records so the herdsman immediately sees confirmation
       await loadRecords();
     } catch (err: any) {
       setErrorMessage(err.message || 'Milk record could not be saved. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this milk record? This cannot be undone.')) return;
+    try {
+      await api.deleteRecord('milk', id);
+      setSuccessMessage('Milk record deleted.');
+      await loadRecords();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Unable to delete milk record.');
     }
   };
 
@@ -128,6 +150,15 @@ export const HerdsmanMilkForm: React.FC = () => {
           </div>
 
           {/* Morning Milk */}
+          {cows.length > 0 && <div>
+            <label htmlFor="cowId" className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1.5">Cow (optional)</label>
+            <select id="cowId" value={cowId} onChange={(e) => setCowId(e.target.value)} className="w-full h-12 px-3 text-base border border-stone-300 rounded-lg bg-white">
+              <option value="">Farm total / no cow</option>
+              {cows.map(cow => <option key={cow.id} value={cow.id}>{cow.name}{cow.tag ? ` (${cow.tag})` : ''}</option>)}
+            </select>
+          </div>}
+
+          {/* Morning Milk */}
           <div>
             <label htmlFor="morningLitres" className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1.5">
               Morning Milk (Litres)
@@ -136,7 +167,7 @@ export const HerdsmanMilkForm: React.FC = () => {
               <input
                 id="morningLitres"
                 type="number"
-                step="0.5"
+              step="any"
                 min="0"
                 placeholder="0.0"
                 value={morningLitres}
@@ -156,7 +187,7 @@ export const HerdsmanMilkForm: React.FC = () => {
               <input
                 id="eveningLitres"
                 type="number"
-                step="0.5"
+              step="any"
                 min="0"
                 placeholder="0.0"
                 value={eveningLitres}
@@ -229,6 +260,7 @@ export const HerdsmanMilkForm: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right">
+                  <button type="button" onClick={() => handleDelete(rec.id)} aria-label="Delete milk record" className="text-red-700 hover:text-red-900 mb-1"><Trash2 className="w-4 h-4" /></button>
                   <span className="inline-block text-base font-bold text-[#1b4332]">
                     {rec.totalLitres} L
                   </span>

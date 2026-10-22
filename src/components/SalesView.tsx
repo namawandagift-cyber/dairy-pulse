@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Buyer, Sale } from '../types';
 import { api } from '../services/api';
-import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
 
 export const SalesView: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -50,6 +50,12 @@ export const SalesView: React.FC = () => {
     const q = parseFloat(quantityLitres) || 0;
     const p = parseFloat(pricePerLitre) || 0;
     return Math.round(q * p);
+  };
+
+  const deleteSale = async (id: string) => {
+    if (!window.confirm('Delete this sale record? This cannot be undone.')) return;
+    try { await api.deleteRecord('sale', id); setFeedback({ type: 'success', message: 'Sale deleted.' }); await fetchData(); }
+    catch (err: any) { setFeedback({ type: 'error', message: err.message || 'Unable to delete sale.' }); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -295,6 +301,7 @@ export const SalesView: React.FC = () => {
                   <th className="py-3 px-4">Price/Litre</th>
                   <th className="py-3 px-4">Total Amount</th>
                   <th className="py-3 px-4">Recorded By</th>
+                  <th className="py-3 px-4">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-stone-800">
@@ -310,6 +317,7 @@ export const SalesView: React.FC = () => {
                       UGX {Math.round(s.totalAmount).toLocaleString()}
                     </td>
                     <td className="py-3 px-4 text-stone-500 whitespace-nowrap">{s.recordedBy || '—'}</td>
+                    <td className="py-3 px-4"><button type="button" onClick={() => void deleteSale(s.id)} aria-label="Delete sale" className="text-red-700"><Trash2 className="w-4 h-4" /></button></td>
                   </tr>
                 ))}
               </tbody>
