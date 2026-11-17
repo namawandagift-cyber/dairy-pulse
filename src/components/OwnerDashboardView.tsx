@@ -116,7 +116,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               {/* Milk Collected */}
               <div className="bg-white border border-stone-200 rounded-lg p-4">
                 <div className="text-xs font-medium text-stone-500">Milk Collected</div>
@@ -146,14 +146,6 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
                 <div className="text-[11px] text-stone-400 mt-1">Total revenue</div>
               </div>
 
-              {/* Expenses */}
-              <div className="bg-white border border-stone-200 rounded-lg p-4">
-                <div className="text-xs font-medium text-stone-500">Expenses</div>
-                <div className="text-xl sm:text-2xl font-bold text-stone-900 mt-1 truncate">
-                  {summary ? formatCurrency(summary.expensesTotal) : 'UGX 0'}
-                </div>
-                <div className="text-[11px] text-stone-400 mt-1">Total farm expenses</div>
-              </div>
             </div>
           </div>
 
@@ -175,14 +167,25 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
               <PlusCircle className="w-3.5 h-3.5 mr-1.5 text-stone-600" />
               Record Sale
             </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('expenses')}
-              className="inline-flex items-center text-xs font-semibold bg-stone-100 text-stone-800 border border-stone-300 px-3.5 py-2 rounded-md hover:bg-stone-200 transition-colors"
-            >
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5 text-stone-600" />
-              Record Expense
-            </button>
+          </div>
+
+          <div className="mt-10">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-stone-900 tracking-tight">Recent milk sales</h2>
+              <button type="button" onClick={() => onNavigate('sales')} className="text-xs font-semibold text-[#1b4332] hover:underline">View all sales →</button>
+            </div>
+            {!summary?.recentSales?.length ? (
+              <div className="bg-white border border-stone-200 rounded-lg p-6 text-center text-sm text-stone-500">No milk sales recorded yet.</div>
+            ) : (
+              <div className="bg-white border border-stone-200 rounded-lg divide-y divide-stone-100 overflow-hidden">
+                {summary.recentSales.slice(0, 5).map((sale) => (
+                  <div key={sale.id} className="p-4 flex items-center justify-between gap-4">
+                    <div><div className="font-semibold text-stone-900 text-sm">{sale.buyerName}</div><div className="text-xs text-stone-500 mt-0.5">{formatDate(sale.date)} · {sale.quantityLitres} L</div></div>
+                    <div className="font-bold text-[#1b4332] text-sm whitespace-nowrap">{formatCurrency(sale.totalAmount)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Recent Milk Records */}

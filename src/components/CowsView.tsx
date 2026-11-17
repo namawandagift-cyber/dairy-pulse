@@ -25,10 +25,15 @@ export const CowsView: React.FC = () => {
 
   useEffect(() => { void refresh(); }, []);
 
-  const totals = useMemo(() => records.reduce<Record<string, number>>((all, record) => {
-    if (record.cowId) all[record.cowId] = (all[record.cowId] || 0) + Number(record.totalLitres || 0);
+  const production = useMemo(() => records.reduce<Record<string, { total: number; today: number }>>((all, record) => {
+    if (record.cowId) {
+      const entry = all[record.cowId] || (all[record.cowId] = { total: 0, today: 0 });
+      const litres = Number(record.totalLitres || 0);
+      entry.total += litres;
+      if (record.date?.slice(0, 10) === new Date().toLocaleDateString('en-CA')) entry.today += litres;
+    }
     return all;
-  }, {}), [records]);
+  }, {} as Record<string, { total: number; today: number }>), [records]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setFeedback(null); setBusy(true);
@@ -42,7 +47,7 @@ export const CowsView: React.FC = () => {
   };
 
   const deleteCow = async (cow: Cow) => {
-    if ((totals[cow.id] || 0) > 0) {
+    if ((production[cow.id]?.total || 0) > 0) {
       setFeedback({ type: 'error', message: 'This cow has milk records. Keep the cow registered so its production history stays linked.' });
       return;
     }
@@ -53,7 +58,7 @@ export const CowsView: React.FC = () => {
 
   return <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10">
     <div className="flex items-center justify-between pb-6 border-b border-stone-200">
-      <div><h1 className="text-2xl font-bold text-stone-900">Cows</h1><p className="text-sm text-stone-500 mt-1">Register your herd and track milk production by cow.</p></div>
+      <div><h1 className="text-2xl font-bold text-stone-900">Cow Production</h1><p className="text-sm text-stone-500 mt-1">See how much milk each cow produces and keep the herd list up to date.</p></div>
       <button type="button" onClick={() => void refresh()} disabled={busy} className="inline-flex items-center text-xs font-semibold bg-white border border-stone-300 rounded px-3 py-2"><RefreshCw className={`w-4 h-4 mr-2 ${busy ? 'animate-spin' : ''}`} />Refresh</button>
     </div>
     {feedback && <div className={`mt-4 p-3 rounded-lg border text-sm flex items-center gap-2 ${feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'}`}>{feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}{feedback.message}</div>}
@@ -64,11 +69,11 @@ export const CowsView: React.FC = () => {
       <button disabled={busy} className="h-10 inline-flex items-center justify-center rounded bg-[#1b4332] text-white text-sm font-semibold"><PlusCircle className="w-4 h-4 mr-2" />Register Cow</button>
     </form>
     <div className="mt-6 bg-white border border-stone-200 rounded-lg overflow-x-auto">
-      <table className="w-full text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Tag</th><th className="p-3">Breed</th><th className="p-3">Recorded milk</th><th className="p-3">Action</th></tr></thead>
-        <tbody className="divide-y divide-stone-100">{cows.map(cow => <tr key={cow.id}><td className="p-3 font-semibold">{cow.name}</td><td className="p-3">{cow.tag || '—'}</td><td className="p-3">{cow.breed || '—'}</td><td className="p-3 font-bold text-[#1b4332]">{(totals[cow.id] || 0).toLocaleString()} L</td><td className="p-3"><button type="button" onClick={() => void deleteCow(cow)} aria-label={`Delete ${cow.name}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>)}
-          {cows.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-stone-500">No cows registered yet.</td></tr>}</tbody>
+      <table className="w-full text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Tag</th><th className="p-3">Breed</th><th className="p-3">Today</th><th className="p-3">All recorded</th><th className="p-3">Action</th></tr></thead>
+        <tbody className="divide-y divide-stone-100">{cows.map(cow => <tr key={cow.id}><td className="p-3 font-semibold">{cow.name}</td><td className="p-3">{cow.tag || '—'}</td><td className="p-3">{cow.breed || '—'}</td><td className="p-3 font-bold text-[#1b4332]">{(production[cow.id]?.today || 0).toLocaleString()} L</td><td className="p-3">{(production[cow.id]?.total || 0).toLocaleString()} L</td><td className="p-3"><button type="button" onClick={() => void deleteCow(cow)} aria-label={`Delete ${cow.name}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>)}
+          {cows.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-stone-500">No cows registered yet.</td></tr>}</tbody>
       </table>
     </div>
-    <p className="mt-3 text-xs text-stone-500">Production totals include records linked to each cow. Older milk records remain intact and appear in farm totals.</p>
+    <p className="mt-3 text-xs text-stone-500">Per cow totals use milk records linked to that cow. Add production from Milk Records; older unassigned records remain in farm totals.</p>
   </div>;
 };

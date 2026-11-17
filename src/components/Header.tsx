@@ -73,14 +73,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
             </button>
             <button
               type="button"
-              onClick={() => onTabChange('milk')}
-              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${
-                currentTab === 'milk'
-                  ? 'bg-[#1b4332] text-white'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
+              onClick={() => onTabChange('cows')}
+              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${currentTab === 'cows' ? 'bg-[#1b4332] text-white' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'}`}
             >
-              Milk Records
+              Cow Production
             </button>
             <button
               type="button"
@@ -92,55 +88,6 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
               }`}
             >
               Sales
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange('cows')}
-              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${currentTab === 'cows' ? 'bg-[#1b4332] text-white' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'}`}
-            >Cows</button>
-            <button
-              type="button"
-              onClick={() => onTabChange('expenses')}
-              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${
-                currentTab === 'expenses'
-                  ? 'bg-[#1b4332] text-white'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Expenses
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange('buyers')}
-              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${
-                currentTab === 'buyers'
-                  ? 'bg-[#1b4332] text-white'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Buyers
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange('team')}
-              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${
-                currentTab === 'team'
-                  ? 'bg-[#1b4332] text-white'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Herdsmen
-            </button>
-            <button
-              type="button"
-              onClick={() => onTabChange('farm')}
-              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${
-                currentTab === 'farm'
-                  ? 'bg-[#1b4332] text-white'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Farm Details
             </button>
           </nav>
         )}
