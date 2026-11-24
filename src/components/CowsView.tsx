@@ -31,17 +31,13 @@ export const CowsView: React.FC = () => {
 
   useEffect(() => { void refresh(); }, []);
 
-  const production = useMemo(() => records.reduce<Record<string, { total: number; today: number; selectedDate: number }>>((all, record) => {
+  const production = useMemo(() => records.reduce<Record<string, number>>((all, record) => {
     if (record.cowId) {
-      const entry = all[record.cowId] || (all[record.cowId] = { total: 0, today: 0, selectedDate: 0 });
       const litres = Number(record.totalLitres || 0);
-      entry.total += litres;
-      const recordDate = getLocalDateKey(record.date);
-      if (recordDate === getTodayDateKey()) entry.today += litres;
-      if (recordDate === productionDate) entry.selectedDate += litres;
+      all[record.cowId] = (all[record.cowId] || 0) + litres;
     }
     return all;
-  }, {} as Record<string, { total: number; today: number; selectedDate: number }>), [records, productionDate]);
+  }, {} as Record<string, number>), [records]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setFeedback(null);
@@ -117,7 +113,7 @@ export const CowsView: React.FC = () => {
   };
 
   const deleteCow = async (cow: Cow) => {
-    if ((production[cow.id]?.total || 0) > 0) {
+    if ((production[cow.id] || 0) > 0) {
       setFeedback({ type: 'error', message: 'This cow has milk records. Keep the cow registered so its production history stays linked.' });
       return;
     }
@@ -142,7 +138,7 @@ export const CowsView: React.FC = () => {
     </form>
     <div className="mt-6 mb-3"><h2 className="font-bold text-stone-900">Daily cow production</h2><p className="text-xs text-stone-500 mt-1">For each registered cow, enter both milkings for the selected date.</p></div>
     <div className="bg-white border border-stone-200 rounded-lg overflow-x-auto">
-      <table className="w-full min-w-[740px] text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Morning (L)</th><th className="p-3">Evening (L)</th><th className="p-3">Total (L)</th><th className="p-3">Selected date</th><th className="p-3">All recorded</th><th className="p-3">Action</th></tr></thead>
+      <table className="w-full min-w-[580px] text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Morning (L)</th><th className="p-3">Evening (L)</th><th className="p-3">Total (L)</th><th className="p-3">Action</th></tr></thead>
         <tbody className="divide-y divide-stone-100">{cows.map(cow => {
           const input = milkInputs[cow.id] || { morning: '', evening: '' };
           const dayRecords = records.filter(record => record.cowId === cow.id && getLocalDateKey(record.date) === productionDate);
@@ -154,10 +150,10 @@ export const CowsView: React.FC = () => {
             {(['morning', 'evening'] as const).map(period => <td key={period} className="p-2">{isEditing
               ? <input type="number" min="0" step="any" aria-label={`${cow.name} ${period} litres`} value={input[period]} onChange={e => setMilkInputs(current => ({ ...current, [cow.id]: { ...(current[cow.id] || { morning: '', evening: '' }), [period]: e.target.value } }))} placeholder="Enter litres" className="w-24 h-9 px-2 border border-stone-300 rounded" />
               : <span>{dayRecords.length ? `${(period === 'morning' ? savedMorning : savedEvening).toLocaleString()} L` : '—'}</span>}</td>)}
-            <td className="p-3 font-bold text-[#1b4332]">{isEditing ? `${((Number(input.morning) || 0) + (Number(input.evening) || 0)).toLocaleString()} L` : dayRecords.length ? `${savedTotal.toLocaleString()} L` : '—'}</td><td className="p-3">{(production[cow.id]?.selectedDate || 0).toLocaleString()} L</td><td className="p-3">{(production[cow.id]?.total || 0).toLocaleString()} L</td>
+            <td className="p-3 font-bold text-[#1b4332]">{isEditing ? `${((Number(input.morning) || 0) + (Number(input.evening) || 0)).toLocaleString()} L` : dayRecords.length ? `${savedTotal.toLocaleString()} L` : '—'}</td>
             <td className="p-2"><div className="flex items-center gap-2">{isEditing ? <><button type="button" disabled={busy} onClick={() => void saveCowMilk(cow)} className="px-3 py-2 rounded bg-[#1b4332] text-white text-xs font-semibold disabled:opacity-50">Save</button><button type="button" disabled={busy} onClick={() => { setEditingCowId(null); setMilkInputs(current => ({ ...current, [cow.id]: { morning: '', evening: '' } })); }} className="text-xs text-stone-600">Cancel</button></> : <button type="button" disabled={busy} onClick={() => { setMilkInputs(current => ({ ...current, [cow.id]: dayRecords.length ? { morning: String(savedMorning), evening: String(savedEvening) } : { morning: '', evening: '' } })); setEditingCowId(cow.id); }} className="px-3 py-2 rounded border border-stone-300 text-xs font-semibold disabled:opacity-50">{dayRecords.length ? 'Edit' : 'Record'}</button>}<button type="button" onClick={() => void deleteCow(cow)} aria-label={`Delete ${cow.name}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></div></td></tr>;
         })}
-          {cows.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-stone-500">No cows registered yet. Enter a cow’s name and both milking amounts in the form above.</td></tr>}</tbody>
+          {cows.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-stone-500">No cows registered yet. Enter a cow’s name and both milking amounts in the form above.</td></tr>}</tbody>
       </table>
     </div>
     <p className="mt-3 text-xs text-stone-500">Saved morning and evening litres appear in the cow’s row, and the total is calculated automatically. Use Edit at the end of the row to change that date’s figures.</p>
