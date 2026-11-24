@@ -12,8 +12,6 @@ export const CowsView: React.FC = () => {
   const [cows, setCows] = useState<Cow[]>([]);
   const [records, setRecords] = useState<MilkRecord[]>([]);
   const [name, setName] = useState('');
-  const [tag, setTag] = useState('');
-  const [breed, setBreed] = useState('');
   const [newCowMorning, setNewCowMorning] = useState('');
   const [newCowEvening, setNewCowEvening] = useState('');
   const [productionDate, setProductionDate] = useState(localDate);
@@ -34,27 +32,36 @@ export const CowsView: React.FC = () => {
 
   useEffect(() => { void refresh(); }, []);
 
-  const production = useMemo(() => records.reduce<Record<string, { total: number; today: number }>>((all, record) => {
+  const production = useMemo(() => records.reduce<Record<string, { total: number; today: number; selectedDate: number }>>((all, record) => {
     if (record.cowId) {
-      const entry = all[record.cowId] || (all[record.cowId] = { total: 0, today: 0 });
+      const entry = all[record.cowId] || (all[record.cowId] = { total: 0, today: 0, selectedDate: 0 });
       const litres = Number(record.totalLitres || 0);
       entry.total += litres;
       if (record.date?.slice(0, 10) === new Date().toLocaleDateString('en-CA')) entry.today += litres;
+      if (record.date?.slice(0, 10) === productionDate) entry.selectedDate += litres;
     }
     return all;
-  }, {} as Record<string, { total: number; today: number }>), [records]);
+  }, {} as Record<string, { total: number; today: number; selectedDate: number }>), [records, productionDate]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault(); setFeedback(null);
+    if (newCowMorning.trim() === '' || newCowEvening.trim() === '') {
+      setFeedback({ type: 'error', message: 'Morning and evening litres are both required to register a cow.' });
+      return;
+    }
     const morning = Number(newCowMorning) || 0;
     const evening = Number(newCowEvening) || 0;
     if (!Number.isFinite(morning) || !Number.isFinite(evening) || morning < 0 || evening < 0) {
       setFeedback({ type: 'error', message: 'Enter valid, non-negative morning and evening litres.' });
       return;
     }
+    if (morning === 0 && evening === 0) {
+      setFeedback({ type: 'error', message: 'Enter milk for at least one milking. Either morning or evening can be 0 L.' });
+      return;
+    }
     setBusy(true);
     try {
-      const cow = await api.createCow({ name: name.trim(), tag: tag.trim(), breed: breed.trim() });
+      const cow = await api.createCow({ name: name.trim() });
       const hasMilk = morning > 0 || evening > 0;
       if (hasMilk) {
         try {
@@ -66,7 +73,7 @@ export const CowsView: React.FC = () => {
       } else {
         setFeedback({ type: 'success', message: `${cow.name} registered. You can record its milk in the table below.` });
       }
-      setName(''); setTag(''); setBreed(''); setNewCowMorning(''); setNewCowEvening('');
+      setName(''); setNewCowMorning(''); setNewCowEvening('');
       await refresh();
     } catch (err: any) { setFeedback({ type: 'error', message: err.message || 'Unable to register cow.' }); }
     finally { setBusy(false); }
@@ -74,6 +81,10 @@ export const CowsView: React.FC = () => {
 
   const saveCowMilk = async (cow: Cow) => {
     const entry = milkInputs[cow.id] || { morning: '', evening: '' };
+    if (entry.morning.trim() === '' || entry.evening.trim() === '') {
+      setFeedback({ type: 'error', message: `Enter both morning and evening litres for ${cow.name}. Use 0 if no milk was collected in one milking.` });
+      return;
+    }
     const morning = Number(entry.morning) || 0;
     const evening = Number(entry.evening) || 0;
     if (!Number.isFinite(morning) || !Number.isFinite(evening) || morning < 0 || evening < 0) {
@@ -81,7 +92,7 @@ export const CowsView: React.FC = () => {
       return;
     }
     if (morning === 0 && evening === 0) {
-      setFeedback({ type: 'error', message: `Enter morning or evening litres for ${cow.name}.` });
+      setFeedback({ type: 'error', message: `Enter milk for at least one milking for ${cow.name}.` });
       return;
     }
     setBusy(true); setFeedback(null);
@@ -106,29 +117,28 @@ export const CowsView: React.FC = () => {
 
   return <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10">
     <div className="flex items-center justify-between pb-6 border-b border-stone-200">
-      <div><h1 className="text-2xl font-bold text-stone-900">Cow Production</h1><p className="text-sm text-stone-500 mt-1">See how much milk each cow produces and keep the herd list up to date.</p></div>
+      <div><h1 className="text-2xl font-bold text-stone-900">Cow Production</h1><p className="text-sm text-stone-500 mt-1">Register cows by name and record each cow’s morning and evening milk.</p></div>
       <button type="button" onClick={() => void refresh()} disabled={busy} className="inline-flex items-center text-xs font-semibold bg-white border border-stone-300 rounded px-3 py-2"><RefreshCw className={`w-4 h-4 mr-2 ${busy ? 'animate-spin' : ''}`} />Refresh</button>
     </div>
     {feedback && <div className={`mt-4 p-3 rounded-lg border text-sm flex items-center gap-2 ${feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'}`}>{feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}{feedback.message}</div>}
-    <form onSubmit={submit} className="mt-6 p-5 bg-white border border-stone-200 rounded-lg grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+    <form onSubmit={submit} className="mt-6 p-5 bg-white border border-stone-200 rounded-lg grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
       <label className="text-xs font-semibold text-stone-700">Cow name<input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daisy" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
-      <label className="text-xs font-semibold text-stone-700">Tag / ID<input value={tag} onChange={e => setTag(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
-      <label className="text-xs font-semibold text-stone-700">Breed<input value={breed} onChange={e => setBreed(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
-      <label className="text-xs font-semibold text-stone-700">Morning milk (L)<input type="number" min="0" step="any" value={newCowMorning} onChange={e => setNewCowMorning(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
-      <label className="text-xs font-semibold text-stone-700">Evening milk (L)<input type="number" min="0" step="any" value={newCowEvening} onChange={e => setNewCowEvening(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
-      <button disabled={busy} className="h-10 inline-flex items-center justify-center rounded bg-[#1b4332] text-white text-sm font-semibold disabled:opacity-50"><PlusCircle className="w-4 h-4 mr-2" />{busy ? 'Saving…' : 'Register Cow'}</button>
-      <p className="text-xs text-stone-500 sm:col-span-2 lg:col-span-6">Enter morning and evening litres here to register a cow and save its milk for the selected record date below.</p>
+      <label className="text-xs font-semibold text-stone-700">Morning milk (L)<input required type="number" min="0" step="any" value={newCowMorning} onChange={e => setNewCowMorning(e.target.value)} placeholder="Enter litres" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
+      <label className="text-xs font-semibold text-stone-700">Evening milk (L)<input required type="number" min="0" step="any" value={newCowEvening} onChange={e => setNewCowEvening(e.target.value)} placeholder="Enter litres" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
+      <label className="text-xs font-semibold text-stone-700">Record date<input required type="date" value={productionDate} onChange={e => setProductionDate(e.target.value)} className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
+      <button disabled={busy} className="h-10 inline-flex items-center justify-center rounded bg-[#1b4332] text-white text-sm font-semibold disabled:opacity-50"><PlusCircle className="w-4 h-4 mr-2" />{busy ? 'Saving…' : 'Register & Save Milk'}</button>
+      <p className="text-xs text-stone-500 sm:col-span-2 lg:col-span-5">Cow name, morning milk, and evening milk are required. Enter 0 L for a milking with no collection. This saves the cow and that day’s milk record.</p>
     </form>
-    <div className="mt-6 mb-3 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h2 className="font-bold text-stone-900">Record each cow’s milk</h2><p className="text-xs text-stone-500 mt-1">Enter the morning and evening litres for each cow.</p></div><label className="text-xs font-semibold text-stone-700">Record date<input type="date" value={productionDate} onChange={e => setProductionDate(e.target.value)} className="mt-1 block h-10 px-3 border border-stone-300 rounded text-sm" /></label></div>
+    <div className="mt-6 mb-3"><h2 className="font-bold text-stone-900">Daily cow production</h2><p className="text-xs text-stone-500 mt-1">For each registered cow, enter both milkings for the selected date.</p></div>
     <div className="bg-white border border-stone-200 rounded-lg overflow-x-auto">
-      <table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Tag</th><th className="p-3">Morning (L)</th><th className="p-3">Evening (L)</th><th className="p-3">Entry total</th><th className="p-3">Today total</th><th className="p-3">All recorded</th><th className="p-3">Save</th><th className="p-3">Action</th></tr></thead>
+      <table className="w-full min-w-[740px] text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Morning (L)</th><th className="p-3">Evening (L)</th><th className="p-3">Entry total</th><th className="p-3">Selected date</th><th className="p-3">All recorded</th><th className="p-3">Save</th><th className="p-3">Action</th></tr></thead>
         <tbody className="divide-y divide-stone-100">{cows.map(cow => {
           const input = milkInputs[cow.id] || { morning: '', evening: '' };
-          return <tr key={cow.id}><td className="p-3 font-semibold">{cow.name}<div className="text-xs font-normal text-stone-500">{cow.breed || ''}</div></td><td className="p-3">{cow.tag || '—'}</td>
-            {(['morning', 'evening'] as const).map(period => <td key={period} className="p-2"><input type="number" min="0" step="any" aria-label={`${cow.name} ${period} litres`} value={input[period]} onChange={e => setMilkInputs(current => ({ ...current, [cow.id]: { ...(current[cow.id] || { morning: '', evening: '' }), [period]: e.target.value } }))} placeholder="0" className="w-24 h-9 px-2 border border-stone-300 rounded" /></td>)}
-            <td className="p-3 font-bold text-[#1b4332]">{((Number(input.morning) || 0) + (Number(input.evening) || 0)).toLocaleString()} L</td><td className="p-3">{(production[cow.id]?.today || 0).toLocaleString()} L</td><td className="p-3">{(production[cow.id]?.total || 0).toLocaleString()} L</td><td className="p-2"><button type="button" disabled={busy} onClick={() => void saveCowMilk(cow)} className="px-3 py-2 rounded bg-[#1b4332] text-white text-xs font-semibold disabled:opacity-50">Save</button></td><td className="p-3"><button type="button" onClick={() => void deleteCow(cow)} aria-label={`Delete ${cow.name}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>;
+          return <tr key={cow.id}><td className="p-3 font-semibold">{cow.name}</td>
+            {(['morning', 'evening'] as const).map(period => <td key={period} className="p-2"><input type="number" min="0" step="any" aria-label={`${cow.name} ${period} litres`} value={input[period]} onChange={e => setMilkInputs(current => ({ ...current, [cow.id]: { ...(current[cow.id] || { morning: '', evening: '' }), [period]: e.target.value } }))} placeholder="Enter litres" className="w-24 h-9 px-2 border border-stone-300 rounded" /></td>)}
+            <td className="p-3 font-bold text-[#1b4332]">{((Number(input.morning) || 0) + (Number(input.evening) || 0)).toLocaleString()} L</td><td className="p-3">{(production[cow.id]?.selectedDate || 0).toLocaleString()} L</td><td className="p-3">{(production[cow.id]?.total || 0).toLocaleString()} L</td><td className="p-2"><button type="button" disabled={busy} onClick={() => void saveCowMilk(cow)} className="px-3 py-2 rounded bg-[#1b4332] text-white text-xs font-semibold disabled:opacity-50">Save</button></td><td className="p-3"><button type="button" onClick={() => void deleteCow(cow)} aria-label={`Delete ${cow.name}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>;
         })}
-          {cows.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-stone-500">No cows registered yet. Add cows above to enter individual production.</td></tr>}</tbody>
+          {cows.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-stone-500">No cows registered yet. Enter a cow’s name and both milking amounts in the form above.</td></tr>}</tbody>
       </table>
     </div>
     <p className="mt-3 text-xs text-stone-500">Production is saved as a morning and evening milk record for the selected date. The daily milk register also shows the farm totals and each cow’s total.</p>
