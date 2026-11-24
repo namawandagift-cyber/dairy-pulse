@@ -80,6 +80,13 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onTabChange }) => {
             </button>
             <button
               type="button"
+              onClick={() => onTabChange('milk')}
+              className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${currentTab === 'milk' ? 'bg-[#1b4332] text-white' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'}`}
+            >
+              Milk Records
+            </button>
+            <button
+              type="button"
               onClick={() => onTabChange('sales')}
               className={`px-3 py-1.5 rounded font-medium whitespace-nowrap text-xs sm:text-sm transition-colors ${
                 currentTab === 'sales'

@@ -3,7 +3,7 @@ import { DashboardSummary } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { RefreshCw, PlusCircle } from 'lucide-react';
-import { formatLocalDate, getLocalDateKey } from '../dateUtils';
+import { formatLocalDate, getLocalDateKey, getTodayDateKey } from '../dateUtils';
 
 interface OwnerDashboardViewProps {
   onNavigate: (tab: string) => void;
@@ -19,8 +19,15 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getDashboardSummary();
-      setSummary(data);
+      const [data, allMilkRecords] = await Promise.all([api.getDashboardSummary(), api.getMilkRecords()]);
+      const independentRecords = allMilkRecords.filter(record => !record.cowId);
+      const today = getTodayDateKey();
+      const totalMilk = independentRecords.reduce((sum, record) => sum + (Number(record.totalLitres) || 0), 0);
+      const todayMilk = independentRecords
+        .filter(record => getLocalDateKey(record.date) === today)
+        .reduce((sum, record) => sum + (Number(record.totalLitres) || 0), 0);
+      independentRecords.sort((a, b) => getLocalDateKey(b.date).localeCompare(getLocalDateKey(a.date)));
+      setSummary({ ...data, todayMilk, totalMilk, recentMilkRecords: independentRecords.slice(0, 10) });
     } catch (err: any) {
       setError(err.message || 'Unable to load dashboard data from Google Sheets.');
     } finally {
@@ -34,7 +41,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
 
   const recentMilkDays = useMemo(() => {
     const days: Record<string, { date: string; morning: number; evening: number }> = {};
-    (summary?.recentMilkRecords || []).filter(record => record.cowId).forEach(record => {
+    (summary?.recentMilkRecords || []).filter(record => !record.cowId).forEach(record => {
       const date = getLocalDateKey(record.date);
       if (!date) return;
       const day = days[date] || (days[date] = { date, morning: 0, evening: 0 });
@@ -197,7 +204,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
 
             {recentMilkDays.length === 0 ? (
               <div className="bg-white border border-stone-200 rounded-lg p-8 text-center text-sm text-stone-500">
-                No cow milk records yet. Add daily production from Cow Production.
+                No independent milk records yet. Add daily totals from Milk Records.
               </div>
             ) : (
               <div className="bg-white border border-stone-200 rounded-lg divide-y divide-stone-100 overflow-hidden">
