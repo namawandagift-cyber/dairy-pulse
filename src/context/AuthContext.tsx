@@ -74,7 +74,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
     setError(null);
     try {
       const res = await api.login(email, password);
@@ -85,8 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const msg = err.message || 'Login failed. Please check your credentials.';
       setError(msg);
       throw new Error(msg);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -100,7 +97,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     farmPhone?: string;
     farmDescription?: string;
   }) => {
-    setIsLoading(true);
     setError(null);
     try {
       const res = await api.register(data);
@@ -111,8 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const msg = err.message || 'Account creation failed. Please try again.';
       setError(msg);
       throw new Error(msg);
-    } finally {
-      setIsLoading(false);
     }
   };
 
