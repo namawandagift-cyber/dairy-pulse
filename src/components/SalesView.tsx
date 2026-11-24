@@ -1,16 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Buyer, Sale } from '../types';
 import { api } from '../services/api';
-import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
-import { formatLocalDate, getLocalDateKey, getTodayDateKey, getWeekday } from '../dateUtils';
-
-type DailySales = { date: string; totalLitres: number; totalAmount: number; buyers: Record<string, { litres: number; amount: number }> };
+import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Pencil } from 'lucide-react';
+import { formatLocalDate, getTodayDateKey } from '../dateUtils';
 
 export const SalesView: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
 
   // Form
   const [date, setDate] = useState<string>(getTodayDateKey);
@@ -41,37 +40,6 @@ export const SalesView: React.FC = () => {
     fetchData();
   }, []);
 
-  const buyerColumns = useMemo(() => {
-    const names = [...buyers.map(buyer => buyer.name), ...sales.map(sale => sale.buyerName)];
-    return Array.from(new Set(names.map(name => name.trim()).filter(Boolean)));
-  }, [buyers, sales]);
-
-  const dailySales = useMemo(() => {
-    const grouped: Record<string, DailySales> = {};
-    sales.forEach(sale => {
-      const day = getLocalDateKey(sale.date);
-      if (!day) return;
-      const summary = grouped[day] || (grouped[day] = { date: day, totalLitres: 0, totalAmount: 0, buyers: {} });
-      const buyer = sale.buyerName.trim();
-      const cell = summary.buyers[buyer] || (summary.buyers[buyer] = { litres: 0, amount: 0 });
-      cell.litres += Number(sale.quantityLitres) || 0;
-      cell.amount += Number(sale.totalAmount) || 0;
-      summary.totalLitres += Number(sale.quantityLitres) || 0;
-      summary.totalAmount += Number(sale.totalAmount) || 0;
-    });
-    return Object.values(grouped).sort((a, b) => b.date.localeCompare(a.date));
-  }, [sales]);
-
-  const totalsByBuyer = useMemo(() => sales.reduce<Record<string, { litres: number; amount: number }>>((totals, sale) => {
-    const name = sale.buyerName.trim();
-    const total = totals[name] || (totals[name] = { litres: 0, amount: 0 });
-    total.litres += Number(sale.quantityLitres) || 0;
-    total.amount += Number(sale.totalAmount) || 0;
-    return totals;
-  }, {}), [sales]);
-  const grandTotalLitres = dailySales.reduce((total, day) => total + day.totalLitres, 0);
-  const grandTotalAmount = dailySales.reduce((total, day) => total + day.totalAmount, 0);
-
   const handleBuyerSelect = (bId: string) => {
     setBuyerId(bId);
     const b = buyers.find((x) => x.id === bId);
@@ -86,10 +54,16 @@ export const SalesView: React.FC = () => {
     return Math.round(q * p);
   };
 
-  const deleteSale = async (id: string) => {
-    if (!window.confirm('Delete this sale record? This cannot be undone.')) return;
-    try { await api.deleteRecord('sale', id); setFeedback({ type: 'success', message: 'Sale deleted.' }); await fetchData(); }
-    catch (err: any) { setFeedback({ type: 'error', message: err.message || 'Unable to delete sale.' }); }
+  const editSale = (sale: Sale) => {
+    setEditingSaleId(sale.id);
+    setDate(getLocalDateKey(sale.date) || getTodayDateKey());
+    setBuyerId(sale.buyerId || '');
+    setBuyerName(sale.buyerName);
+    setQuantityLitres(String(sale.quantityLitres));
+    setPricePerLitre(String(sale.pricePerLitre));
+    setShowAddForm(true);
+    setFeedback(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,23 +90,20 @@ export const SalesView: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const sale = await api.createSale({
-        buyerId: buyerId || undefined,
-        buyerName: buyerName.trim(),
-        date,
-        quantityLitres: q,
-        pricePerLitre: p,
-      });
+      const sale = editingSaleId
+        ? await api.updateSale({ id: editingSaleId, buyerId: buyerId || undefined, buyerName: buyerName.trim(), date, quantityLitres: q, pricePerLitre: p })
+        : await api.createSale({ buyerId: buyerId || undefined, buyerName: buyerName.trim(), date, quantityLitres: q, pricePerLitre: p });
 
       setFeedback({
         type: 'success',
-        message: `Sale recorded: ${sale.quantityLitres} L for UGX ${sale.totalAmount.toLocaleString()}`,
+        message: `${editingSaleId ? 'Sale updated' : 'Sale recorded'}: ${sale.quantityLitres} L for UGX ${sale.totalAmount.toLocaleString()}`,
       });
 
       setQuantityLitres('');
       setPricePerLitre('');
       setBuyerId('');
       setBuyerName('');
+      setEditingSaleId(null);
       setShowAddForm(false);
       await fetchData();
     } catch (err: any) {
@@ -165,13 +136,20 @@ export const SalesView: React.FC = () => {
           <button
             type="button"
             onClick={() => {
+              if (showAddForm) {
+                setEditingSaleId(null);
+                setBuyerId('');
+                setBuyerName('');
+                setQuantityLitres('');
+                setPricePerLitre('');
+              }
               setShowAddForm(!showAddForm);
               setFeedback(null);
             }}
             className="inline-flex items-center text-xs font-semibold bg-[#1b4332] text-white px-3.5 py-2 rounded hover:bg-[#2d6a4f] transition-colors"
           >
-            <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-            {showAddForm ? 'Cancel' : 'Record Sale'}
+            {showAddForm ? <span className="mr-1.5">×</span> : <PlusCircle className="w-3.5 h-3.5 mr-1.5" />}
+            {showAddForm ? 'Cancel' : 'Record another sale'}
           </button>
         </div>
       </div>
@@ -193,12 +171,13 @@ export const SalesView: React.FC = () => {
         </div>
       )}
 
-      {/* Add Sale Form */}
+      {/* Add or edit sale form */}
       {showAddForm && (
         <div className="mt-6 bg-stone-50 border border-stone-300 rounded-lg p-5">
           <h2 className="text-sm font-bold text-stone-900 uppercase tracking-wider mb-4">
-            Record Milk Sale
+            {editingSaleId ? 'Edit Sale Details' : 'Record Milk Sale'}
           </h2>
+          <p className="text-xs text-stone-600 -mt-2 mb-4">Record each buyer as a separate sale. Use the same date for multiple buyers.</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -295,50 +274,23 @@ export const SalesView: React.FC = () => {
                 disabled={isSaving}
                 className="bg-[#1b4332] text-white px-5 py-2 rounded text-xs font-bold hover:bg-[#2d6a4f] transition-colors disabled:opacity-50 cursor-pointer"
               >
-                {isSaving ? 'Saving...' : 'Save Sale Record'}
+                {isSaving ? 'Saving...' : editingSaleId ? 'Save Changes' : 'Save Sale Record'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Daily sales register */}
       <div className="mt-8">
-        <div className="mb-3"><h2 className="text-base font-bold text-stone-900">Daily sales register</h2><p className="text-xs text-stone-500 mt-1">Daily litres and revenue, broken down by buyer.</p></div>
-        {isLoading ? (
-          <div className="py-12 text-center text-sm text-stone-500">Loading sales records...</div>
-        ) : dailySales.length === 0 ? (
-          <div className="bg-white border border-stone-200 rounded-lg p-10 text-center text-sm text-stone-500">
-            No sales recorded yet. Click "Record Sale" to add your first transaction.
-          </div>
-        ) : (
-          <div className="bg-white border border-stone-200 rounded-lg overflow-x-auto shadow-xs">
-            <table className="w-full min-w-max text-left text-sm">
-              <thead className="bg-[#416f96] border-b border-[#315b7d] text-white font-semibold text-xs sm:text-sm"><tr>
-                <th className="py-3 px-4">Date</th><th className="py-3 px-4">Day</th>
-                {buyerColumns.map(name => <th key={name} className="py-3 px-4 text-right">{name}</th>)}
-                <th className="py-3 px-4 text-right">Total (Litres)</th><th className="py-3 px-4 text-right">Total Sales (UGX)</th>
-              </tr></thead>
-              <tbody className="divide-y divide-stone-200 text-stone-900">{dailySales.map((day, index) => <tr key={day.date} className={index % 2 ? 'bg-slate-100' : 'bg-white'}>
-                <td className="py-2.5 px-4 font-medium whitespace-nowrap">{formatLocalDate(day.date)}</td><td className="py-2.5 px-4 text-center">{getWeekday(day.date)}</td>
-                {buyerColumns.map(name => { const cell = day.buyers[name]; return <td key={name} className="py-2.5 px-4 text-right whitespace-nowrap">{cell ? <><span className="font-medium">{cell.litres.toLocaleString()} L</span><span className="block text-xs text-stone-500">UGX {Math.round(cell.amount).toLocaleString()}</span></> : '—'}</td>; })}
-                <td className="py-2.5 px-4 text-right font-bold whitespace-nowrap">{day.totalLitres.toLocaleString()}</td><td className="py-2.5 px-4 text-right font-bold whitespace-nowrap">UGX {Math.round(day.totalAmount).toLocaleString()}</td>
-              </tr>)}</tbody>
-              <tfoot className="bg-[#d9e2f3] border-t border-stone-300 font-bold text-stone-900"><tr>
-                <td className="py-3 px-4">Total</td><td></td>{buyerColumns.map(name => <td key={name} className="py-3 px-4 text-right whitespace-nowrap"><span>{(totalsByBuyer[name]?.litres || 0).toLocaleString()} L</span><span className="block text-xs font-medium">UGX {Math.round(totalsByBuyer[name]?.amount || 0).toLocaleString()}</span></td>)}
-                <td className="py-3 px-4 text-right">{grandTotalLitres.toLocaleString()}</td><td className="py-3 px-4 text-right whitespace-nowrap">UGX {Math.round(grandTotalAmount).toLocaleString()}</td>
-              </tr></tfoot>
-            </table>
-          </div>
-        )}
+        <h2 className="text-base font-bold text-stone-900 mb-3">Sale details</h2>
+        {isLoading ? <div className="py-12 text-center text-sm text-stone-500">Loading sales records...</div> : sales.length === 0 ? (
+          <div className="bg-white border border-stone-200 rounded-lg p-10 text-center text-sm text-stone-500">No sales recorded yet. Click “Record another sale” to add your first transaction.</div>
+        ) : <div className="bg-white border border-stone-200 rounded-lg overflow-x-auto shadow-xs">
+          <table className="w-full text-left text-xs sm:text-sm"><thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold uppercase tracking-wider text-[11px]"><tr><th className="py-3 px-4">Date</th><th className="py-3 px-4">Buyer</th><th className="py-3 px-4">Quantity</th><th className="py-3 px-4">Price/Litre</th><th className="py-3 px-4">Total Amount</th><th className="py-3 px-4">Recorded By</th><th className="py-3 px-4">Action</th></tr></thead>
+            <tbody className="divide-y divide-stone-100 text-stone-800">{sales.map(sale => <tr key={sale.id} className="hover:bg-stone-50/70"><td className="py-3 px-4 font-semibold whitespace-nowrap">{formatLocalDate(sale.date)}</td><td className="py-3 px-4 font-medium whitespace-nowrap">{sale.buyerName}</td><td className="py-3 px-4 whitespace-nowrap">{sale.quantityLitres} L</td><td className="py-3 px-4 whitespace-nowrap">UGX {Math.round(sale.pricePerLitre).toLocaleString()}</td><td className="py-3 px-4 font-bold whitespace-nowrap">UGX {Math.round(sale.totalAmount).toLocaleString()}</td><td className="py-3 px-4 text-stone-500 whitespace-nowrap">{sale.recordedBy || '—'}</td><td className="py-3 px-4"><button type="button" onClick={() => editSale(sale)} aria-label={`Edit sale to ${sale.buyerName}`} className="inline-flex items-center gap-1.5 text-[#1b4332] font-semibold hover:underline"><Pencil className="w-4 h-4" /><span>Edit</span></button></td></tr>)}</tbody>
+          </table>
+        </div>}
       </div>
-
-      {/* Individual sale details retain price and delete controls */}
-      {!isLoading && sales.length > 0 && <div className="mt-8"><h2 className="text-base font-bold text-stone-900 mb-3">Sale details</h2><div className="bg-white border border-stone-200 rounded-lg overflow-x-auto shadow-xs">
-        <table className="w-full text-left text-xs sm:text-sm"><thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold uppercase tracking-wider text-[11px]"><tr><th className="py-3 px-4">Date</th><th className="py-3 px-4">Buyer</th><th className="py-3 px-4">Quantity</th><th className="py-3 px-4">Price/Litre</th><th className="py-3 px-4">Total Amount</th><th className="py-3 px-4">Recorded By</th><th className="py-3 px-4">Action</th></tr></thead>
-          <tbody className="divide-y divide-stone-100 text-stone-800">{sales.map(sale => <tr key={sale.id} className="hover:bg-stone-50/70"><td className="py-3 px-4 font-semibold whitespace-nowrap">{formatLocalDate(sale.date)}</td><td className="py-3 px-4 font-medium whitespace-nowrap">{sale.buyerName}</td><td className="py-3 px-4 whitespace-nowrap">{sale.quantityLitres} L</td><td className="py-3 px-4 whitespace-nowrap">UGX {Math.round(sale.pricePerLitre).toLocaleString()}</td><td className="py-3 px-4 font-bold whitespace-nowrap">UGX {Math.round(sale.totalAmount).toLocaleString()}</td><td className="py-3 px-4 text-stone-500 whitespace-nowrap">{sale.recordedBy || '—'}</td><td className="py-3 px-4"><button type="button" onClick={() => void deleteSale(sale.id)} aria-label={`Delete sale to ${sale.buyerName}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody>
-        </table>
-      </div></div>}
     </div>
   );
 };

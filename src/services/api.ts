@@ -251,6 +251,18 @@ class ApiService {
     return res.sale;
   }
 
+  async updateSale(params: {
+    id: string;
+    buyerId?: string;
+    buyerName: string;
+    date: string;
+    quantityLitres: number;
+    pricePerLitre: number;
+  }): Promise<Sale> {
+    const res = await this.request<{ sale: Sale }>('updateSale', params);
+    return res.sale;
+  }
+
   async getFarmDetails(): Promise<Farm> {
     const res = await this.request<{ farm: Farm }>('getFarmDetails');
     return res.farm;

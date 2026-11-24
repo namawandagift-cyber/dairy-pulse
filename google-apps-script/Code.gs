@@ -148,6 +148,9 @@ function doPost(e) {
       case "createSale":
         return handleCreateSale(ss, payload);
 
+      case "updateSale":
+        return handleUpdateSale(ss, payload);
+
       case "getDashboardSummary":
         return handleGetDashboardSummary(ss, payload);
 
@@ -991,6 +994,38 @@ function handleCreateSale(ss, payload) {
       message: "Sale recorded successfully.",
       sale: record
     });
+  } catch (err) {
+    return createJsonResponse({ success: false, error: err.message });
+  }
+}
+
+function handleUpdateSale(ss, payload) {
+  try {
+    const auth = authenticateSession(ss, payload.token, ["OWNER"]);
+    const { id, buyerId, buyerName, date, quantityLitres, pricePerLitre } = payload;
+    if (!id) return createJsonResponse({ success: false, error: "Sale record is required." });
+    if (!date) return createJsonResponse({ success: false, error: "Date is required." });
+    if (!buyerName || !String(buyerName).trim()) return createJsonResponse({ success: false, error: "Buyer name is required." });
+    const qty = parseFloat(quantityLitres);
+    const price = parseFloat(pricePerLitre);
+    if (isNaN(qty) || qty <= 0) return createJsonResponse({ success: false, error: "Quantity in litres must be a positive number." });
+    if (isNaN(price) || price <= 0) return createJsonResponse({ success: false, error: "Price per litre must be a positive number." });
+
+    const headers = SCHEMA.Sales;
+    const sheet = getOrCreateSheet(ss, "Sales", headers);
+    const record = getRowsAsObjects(sheet, headers).find(row => row.id === id && row.farmId === auth.farm.id);
+    if (!record) return createJsonResponse({ success: false, error: "Sale record not found." });
+    record.buyerId = buyerId || "";
+    record.buyerName = String(buyerName).trim();
+    record.date = date;
+    record.quantityLitres = qty;
+    record.pricePerLitre = price;
+    record.totalAmount = Math.round(qty * price * 100) / 100;
+    updateRowByObject(sheet, headers, record._rowNumber, record);
+    logActivity(ss, auth.farm.id, auth.user.id, "UPDATE_SALE", { buyerName: record.buyerName, totalAmount: record.totalAmount });
+    const clean = { ...record };
+    delete clean._rowNumber;
+    return createJsonResponse({ success: true, message: "Sale updated successfully.", sale: clean });
   } catch (err) {
     return createJsonResponse({ success: false, error: err.message });
   }
