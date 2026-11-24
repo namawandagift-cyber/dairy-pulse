@@ -14,6 +14,8 @@ export const CowsView: React.FC = () => {
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
   const [breed, setBreed] = useState('');
+  const [newCowMorning, setNewCowMorning] = useState('');
+  const [newCowEvening, setNewCowEvening] = useState('');
   const [productionDate, setProductionDate] = useState(localDate);
   const [milkInputs, setMilkInputs] = useState<Record<string, { morning: string; evening: string }>>({});
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -43,11 +45,28 @@ export const CowsView: React.FC = () => {
   }, {} as Record<string, { total: number; today: number }>), [records]);
 
   const submit = async (event: React.FormEvent) => {
-    event.preventDefault(); setFeedback(null); setBusy(true);
+    event.preventDefault(); setFeedback(null);
+    const morning = Number(newCowMorning) || 0;
+    const evening = Number(newCowEvening) || 0;
+    if (!Number.isFinite(morning) || !Number.isFinite(evening) || morning < 0 || evening < 0) {
+      setFeedback({ type: 'error', message: 'Enter valid, non-negative morning and evening litres.' });
+      return;
+    }
+    setBusy(true);
     try {
-      await api.createCow({ name: name.trim(), tag: tag.trim(), breed: breed.trim() });
-      setName(''); setTag(''); setBreed('');
-      setFeedback({ type: 'success', message: 'Cow registered.' });
+      const cow = await api.createCow({ name: name.trim(), tag: tag.trim(), breed: breed.trim() });
+      const hasMilk = morning > 0 || evening > 0;
+      if (hasMilk) {
+        try {
+          const milk = await api.createMilkRecord({ date: productionDate, morningLitres: morning, eveningLitres: evening, cowId: cow.id });
+          setFeedback({ type: 'success', message: `${cow.name} registered and ${milk.totalLitres} L of milk saved for ${productionDate}.` });
+        } catch (err: any) {
+          setFeedback({ type: 'error', message: `${cow.name} was registered, but its milk record could not be saved: ${err.message || 'Please enter the milk again in the cow list below.'}` });
+        }
+      } else {
+        setFeedback({ type: 'success', message: `${cow.name} registered. You can record its milk in the table below.` });
+      }
+      setName(''); setTag(''); setBreed(''); setNewCowMorning(''); setNewCowEvening('');
       await refresh();
     } catch (err: any) { setFeedback({ type: 'error', message: err.message || 'Unable to register cow.' }); }
     finally { setBusy(false); }
@@ -91,11 +110,14 @@ export const CowsView: React.FC = () => {
       <button type="button" onClick={() => void refresh()} disabled={busy} className="inline-flex items-center text-xs font-semibold bg-white border border-stone-300 rounded px-3 py-2"><RefreshCw className={`w-4 h-4 mr-2 ${busy ? 'animate-spin' : ''}`} />Refresh</button>
     </div>
     {feedback && <div className={`mt-4 p-3 rounded-lg border text-sm flex items-center gap-2 ${feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'}`}>{feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}{feedback.message}</div>}
-    <form onSubmit={submit} className="mt-6 p-5 bg-white border border-stone-200 rounded-lg grid sm:grid-cols-4 gap-3 items-end">
+    <form onSubmit={submit} className="mt-6 p-5 bg-white border border-stone-200 rounded-lg grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
       <label className="text-xs font-semibold text-stone-700">Cow name<input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daisy" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
       <label className="text-xs font-semibold text-stone-700">Tag / ID<input value={tag} onChange={e => setTag(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
       <label className="text-xs font-semibold text-stone-700">Breed<input value={breed} onChange={e => setBreed(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
-      <button disabled={busy} className="h-10 inline-flex items-center justify-center rounded bg-[#1b4332] text-white text-sm font-semibold"><PlusCircle className="w-4 h-4 mr-2" />Register Cow</button>
+      <label className="text-xs font-semibold text-stone-700">Morning milk (L)<input type="number" min="0" step="any" value={newCowMorning} onChange={e => setNewCowMorning(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
+      <label className="text-xs font-semibold text-stone-700">Evening milk (L)<input type="number" min="0" step="any" value={newCowEvening} onChange={e => setNewCowEvening(e.target.value)} placeholder="Optional" className="mt-1 block w-full h-10 px-3 border border-stone-300 rounded text-sm" /></label>
+      <button disabled={busy} className="h-10 inline-flex items-center justify-center rounded bg-[#1b4332] text-white text-sm font-semibold disabled:opacity-50"><PlusCircle className="w-4 h-4 mr-2" />{busy ? 'Saving…' : 'Register Cow'}</button>
+      <p className="text-xs text-stone-500 sm:col-span-2 lg:col-span-6">Enter morning and evening litres here to register a cow and save its milk for the selected record date below.</p>
     </form>
     <div className="mt-6 mb-3 flex flex-col sm:flex-row sm:items-end justify-between gap-3"><div><h2 className="font-bold text-stone-900">Record each cow’s milk</h2><p className="text-xs text-stone-500 mt-1">Enter the morning and evening litres for each cow.</p></div><label className="text-xs font-semibold text-stone-700">Record date<input type="date" value={productionDate} onChange={e => setProductionDate(e.target.value)} className="mt-1 block h-10 px-3 border border-stone-300 rounded text-sm" /></label></div>
     <div className="bg-white border border-stone-200 rounded-lg overflow-x-auto">
