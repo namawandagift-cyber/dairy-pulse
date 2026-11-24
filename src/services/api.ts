@@ -8,6 +8,7 @@ import {
   Sale,
   User,
 } from '../types';
+import { getTodayDateKey } from '../dateUtils';
 
 const TOKEN_KEY = 'dairypulse_session_token';
 
@@ -162,7 +163,7 @@ class ApiService {
   }
 
   async getDashboardSummary(): Promise<DashboardSummary> {
-    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayDate = getTodayDateKey();
     const res = await this.request<{ summary: DashboardSummary }>('getDashboardSummary', { todayDate });
     return res.summary;
   }

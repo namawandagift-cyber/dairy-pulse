@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Buyer, Sale } from '../types';
 import { api } from '../services/api';
 import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { formatLocalDate, getLocalDateKey, getTodayDateKey, getWeekday } from '../dateUtils';
 
 type DailySales = { date: string; totalLitres: number; totalAmount: number; buyers: Record<string, { litres: number; amount: number }> };
 
@@ -12,10 +13,7 @@ export const SalesView: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
 
   // Form
-  const [date, setDate] = useState<string>(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  });
+  const [date, setDate] = useState<string>(getTodayDateKey);
   const [buyerId, setBuyerId] = useState<string>('');
   const [buyerName, setBuyerName] = useState<string>('');
   const [quantityLitres, setQuantityLitres] = useState<string>('');
@@ -51,7 +49,7 @@ export const SalesView: React.FC = () => {
   const dailySales = useMemo(() => {
     const grouped: Record<string, DailySales> = {};
     sales.forEach(sale => {
-      const day = sale.date?.slice(0, 10) || '';
+      const day = getLocalDateKey(sale.date);
       if (!day) return;
       const summary = grouped[day] || (grouped[day] = { date: day, totalLitres: 0, totalAmount: 0, buyers: {} });
       const buyer = sale.buyerName.trim();
@@ -142,25 +140,6 @@ export const SalesView: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const parts = dateStr.slice(0, 10).split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const weekday = (dateStr: string) => {
-    const [year, month, day] = dateStr.slice(0, 10).split('-').map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: 'short' });
   };
 
   return (
@@ -341,7 +320,7 @@ export const SalesView: React.FC = () => {
                 <th className="py-3 px-4 text-right">Total (Litres)</th><th className="py-3 px-4 text-right">Total Sales (UGX)</th>
               </tr></thead>
               <tbody className="divide-y divide-stone-200 text-stone-900">{dailySales.map((day, index) => <tr key={day.date} className={index % 2 ? 'bg-slate-100' : 'bg-white'}>
-                <td className="py-2.5 px-4 font-medium whitespace-nowrap">{formatDate(day.date)}</td><td className="py-2.5 px-4 text-center">{weekday(day.date)}</td>
+                <td className="py-2.5 px-4 font-medium whitespace-nowrap">{formatLocalDate(day.date)}</td><td className="py-2.5 px-4 text-center">{getWeekday(day.date)}</td>
                 {buyerColumns.map(name => { const cell = day.buyers[name]; return <td key={name} className="py-2.5 px-4 text-right whitespace-nowrap">{cell ? <><span className="font-medium">{cell.litres.toLocaleString()} L</span><span className="block text-xs text-stone-500">UGX {Math.round(cell.amount).toLocaleString()}</span></> : '—'}</td>; })}
                 <td className="py-2.5 px-4 text-right font-bold whitespace-nowrap">{day.totalLitres.toLocaleString()}</td><td className="py-2.5 px-4 text-right font-bold whitespace-nowrap">UGX {Math.round(day.totalAmount).toLocaleString()}</td>
               </tr>)}</tbody>
@@ -357,7 +336,7 @@ export const SalesView: React.FC = () => {
       {/* Individual sale details retain price and delete controls */}
       {!isLoading && sales.length > 0 && <div className="mt-8"><h2 className="text-base font-bold text-stone-900 mb-3">Sale details</h2><div className="bg-white border border-stone-200 rounded-lg overflow-x-auto shadow-xs">
         <table className="w-full text-left text-xs sm:text-sm"><thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold uppercase tracking-wider text-[11px]"><tr><th className="py-3 px-4">Date</th><th className="py-3 px-4">Buyer</th><th className="py-3 px-4">Quantity</th><th className="py-3 px-4">Price/Litre</th><th className="py-3 px-4">Total Amount</th><th className="py-3 px-4">Recorded By</th><th className="py-3 px-4">Action</th></tr></thead>
-          <tbody className="divide-y divide-stone-100 text-stone-800">{sales.map(sale => <tr key={sale.id} className="hover:bg-stone-50/70"><td className="py-3 px-4 font-semibold whitespace-nowrap">{formatDate(sale.date)}</td><td className="py-3 px-4 font-medium whitespace-nowrap">{sale.buyerName}</td><td className="py-3 px-4 whitespace-nowrap">{sale.quantityLitres} L</td><td className="py-3 px-4 whitespace-nowrap">UGX {Math.round(sale.pricePerLitre).toLocaleString()}</td><td className="py-3 px-4 font-bold whitespace-nowrap">UGX {Math.round(sale.totalAmount).toLocaleString()}</td><td className="py-3 px-4 text-stone-500 whitespace-nowrap">{sale.recordedBy || '—'}</td><td className="py-3 px-4"><button type="button" onClick={() => void deleteSale(sale.id)} aria-label={`Delete sale to ${sale.buyerName}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody>
+          <tbody className="divide-y divide-stone-100 text-stone-800">{sales.map(sale => <tr key={sale.id} className="hover:bg-stone-50/70"><td className="py-3 px-4 font-semibold whitespace-nowrap">{formatLocalDate(sale.date)}</td><td className="py-3 px-4 font-medium whitespace-nowrap">{sale.buyerName}</td><td className="py-3 px-4 whitespace-nowrap">{sale.quantityLitres} L</td><td className="py-3 px-4 whitespace-nowrap">UGX {Math.round(sale.pricePerLitre).toLocaleString()}</td><td className="py-3 px-4 font-bold whitespace-nowrap">UGX {Math.round(sale.totalAmount).toLocaleString()}</td><td className="py-3 px-4 text-stone-500 whitespace-nowrap">{sale.recordedBy || '—'}</td><td className="py-3 px-4"><button type="button" onClick={() => void deleteSale(sale.id)} aria-label={`Delete sale to ${sale.buyerName}`} className="text-red-700"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody>
         </table>
       </div></div>}
     </div>

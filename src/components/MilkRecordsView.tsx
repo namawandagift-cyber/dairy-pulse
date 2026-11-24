@@ -2,21 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { MilkRecord, Cow } from '../types';
 import { api } from '../services/api';
 import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { formatLocalDate, getLocalDateKey, getTodayDateKey, getWeekday } from '../dateUtils';
 
 type CowEntry = { morning: string; evening: string };
 type DaySummary = { date: string; morning: number; evening: number; total: number; cows: Record<string, number>; unassigned: number };
-
-const localDate = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
 
 export const MilkRecordsView: React.FC = () => {
   const [records, setRecords] = useState<MilkRecord[]>([]);
   const [cows, setCows] = useState<Cow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [date, setDate] = useState(localDate);
+  const [date, setDate] = useState(getTodayDateKey);
   const [entries, setEntries] = useState<Record<string, CowEntry>>({});
   const [farmEntry, setFarmEntry] = useState<CowEntry>({ morning: '', evening: '' });
   const [notes, setNotes] = useState('');
@@ -44,7 +40,7 @@ export const MilkRecordsView: React.FC = () => {
   const summaries = useMemo(() => {
     const byDate: Record<string, DaySummary> = {};
     records.forEach(record => {
-      const key = record.date?.slice(0, 10) || '';
+      const key = getLocalDateKey(record.date);
       if (!key) return;
       const day = byDate[key] || (byDate[key] = { date: key, morning: 0, evening: 0, total: 0, cows: {}, unassigned: 0 });
       const morning = Number(record.morningLitres) || 0;
@@ -58,16 +54,6 @@ export const MilkRecordsView: React.FC = () => {
     });
     return Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
   }, [records]);
-
-  const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.slice(0, 10).split('-').map(Number);
-    const parsed = new Date(year, month - 1, day);
-    return parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-  const dayName = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: 'short' });
-  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -96,7 +82,7 @@ export const MilkRecordsView: React.FC = () => {
         savedCount++;
       }
       const total = filled.reduce((sum, row) => sum + row.morning + row.evening, 0);
-      setFeedback({ type: 'success', message: `Saved ${savedCount} cow record${savedCount === 1 ? '' : 's'} for ${formatDate(date)} (${total.toLocaleString()} L total).` });
+      setFeedback({ type: 'success', message: `Saved ${savedCount} cow record${savedCount === 1 ? '' : 's'} for ${formatLocalDate(date)} (${total.toLocaleString()} L total).` });
       setEntries({}); setFarmEntry({ morning: '', evening: '' }); setNotes(''); setShowAddForm(false);
       await fetchRecords();
     } catch (err: any) {
@@ -147,7 +133,7 @@ export const MilkRecordsView: React.FC = () => {
     <div className="mt-8"><h2 className="text-base font-bold text-stone-900 mb-3">Daily collection history</h2>
       {isLoading ? <div className="py-12 text-center text-sm text-stone-500">Loading milk records...</div> : summaries.length === 0 ? <div className="bg-white border border-stone-200 rounded-lg p-10 text-center text-sm text-stone-500">No milk records yet.</div> : <div className="bg-white border border-stone-200 rounded-lg overflow-x-auto shadow-xs">
         <table className="w-full text-left text-xs sm:text-sm"><thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-semibold uppercase tracking-wider text-[11px]"><tr><th className="py-3 px-3">Date</th><th className="py-3 px-3">Day</th><th className="py-3 px-3">Morning</th><th className="py-3 px-3">Evening</th>{cows.map(cow => <th key={cow.id} className="py-3 px-3">{cow.name}</th>)}{summaries.some(day => day.unassigned > 0) && <th className="py-3 px-3">Unassigned</th>}<th className="py-3 px-3 text-[#1b4332]">Total (L)</th><th className="py-3 px-3">Actions</th></tr></thead>
-          <tbody className="divide-y divide-stone-100 text-stone-800">{summaries.map(day => <tr key={day.date} className="hover:bg-stone-50/70"><td className="py-3 px-3 font-semibold whitespace-nowrap">{formatDate(day.date)}</td><td className="py-3 px-3">{dayName(day.date)}</td><td className="py-3 px-3 whitespace-nowrap">{day.morning.toLocaleString()} L</td><td className="py-3 px-3 whitespace-nowrap">{day.evening.toLocaleString()} L</td>{cows.map(cow => <td key={cow.id} className="py-3 px-3 whitespace-nowrap">{(day.cows[cow.id] || 0).toLocaleString()} L</td>)}{summaries.some(item => item.unassigned > 0) && <td className="py-3 px-3 whitespace-nowrap">{day.unassigned.toLocaleString()} L</td>}<td className="py-3 px-3 font-bold text-[#1b4332] whitespace-nowrap">{day.total.toLocaleString()} L</td><td className="py-3 px-3"><div className="flex gap-1">{records.filter(r => r.date?.slice(0, 10) === day.date).map(r => <button key={r.id} type="button" onClick={() => void handleDelete(r.id)} aria-label={`Delete ${r.cowId ? cows.find(c => c.id === r.cowId)?.name || 'cow' : 'farm'} record`} title={`Delete ${r.cowId ? cows.find(c => c.id === r.cowId)?.name || 'cow' : 'farm'} record`} className="text-red-700 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>)}</div></td></tr>)}</tbody>
+          <tbody className="divide-y divide-stone-100 text-stone-800">{summaries.map(day => <tr key={day.date} className="hover:bg-stone-50/70"><td className="py-3 px-3 font-semibold whitespace-nowrap">{formatLocalDate(day.date)}</td><td className="py-3 px-3">{getWeekday(day.date)}</td><td className="py-3 px-3 whitespace-nowrap">{day.morning.toLocaleString()} L</td><td className="py-3 px-3 whitespace-nowrap">{day.evening.toLocaleString()} L</td>{cows.map(cow => <td key={cow.id} className="py-3 px-3 whitespace-nowrap">{(day.cows[cow.id] || 0).toLocaleString()} L</td>)}{summaries.some(item => item.unassigned > 0) && <td className="py-3 px-3 whitespace-nowrap">{day.unassigned.toLocaleString()} L</td>}<td className="py-3 px-3 font-bold text-[#1b4332] whitespace-nowrap">{day.total.toLocaleString()} L</td><td className="py-3 px-3"><div className="flex gap-1">{records.filter(r => getLocalDateKey(r.date) === day.date).map(r => <button key={r.id} type="button" onClick={() => void handleDelete(r.id)} aria-label={`Delete ${r.cowId ? cows.find(c => c.id === r.cowId)?.name || 'cow' : 'farm'} record`} title={`Delete ${r.cowId ? cows.find(c => c.id === r.cowId)?.name || 'cow' : 'farm'} record`} className="text-red-700 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>)}</div></td></tr>)}</tbody>
         </table>
       </div>}
     </div>

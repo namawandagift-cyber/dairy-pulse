@@ -4,14 +4,13 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { Cow } from '../types';
+import { formatLocalDate, getTodayDateKey } from '../dateUtils';
 
 export const HerdsmanMilkForm: React.FC = () => {
   const { user, farm } = useAuth();
 
   // Today's date default (YYYY-MM-DD)
-  const getTodayString = () => new Date().toISOString().slice(0, 10);
-
-  const [date, setDate] = useState<string>(getTodayString());
+  const [date, setDate] = useState<string>(getTodayDateKey);
   const [morningLitres, setMorningLitres] = useState<string>('');
   const [eveningLitres, setEveningLitres] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -252,7 +251,7 @@ export const HerdsmanMilkForm: React.FC = () => {
               <div key={rec.id} className="p-3.5 flex items-center justify-between">
                 <div>
                   <div className="font-semibold text-stone-900 text-sm">
-                    {rec.date ? new Date(rec.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown date'}
+                    {formatLocalDate(rec.date) || 'Unknown date'}
                   </div>
                   <div className="text-xs text-stone-500 mt-0.5">
                     Morning: {rec.morningLitres} L • Evening: {rec.eveningLitres} L

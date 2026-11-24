@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Expense } from '../types';
 import { api } from '../services/api';
 import { PlusCircle, RefreshCw, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { formatLocalDate, getTodayDateKey } from '../dateUtils';
 
 const COMMON_CATEGORIES = [
   'Feed & Forage',
@@ -20,7 +21,7 @@ export const ExpensesView: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
 
   // Form
-  const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState<string>(getTodayDateKey);
   const [category, setCategory] = useState<string>(COMMON_CATEGORIES[0]);
   const [customCategory, setCustomCategory] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
@@ -83,17 +84,7 @@ export const ExpensesView: React.FC = () => {
   };
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const parts = dateStr.slice(0, 10).split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
+    return formatLocalDate(dateStr);
   };
 
   const totalExpenseAmount = expenses.reduce((sum, e) => sum + (parseFloat(String(e.amount)) || 0), 0);

@@ -3,6 +3,7 @@ import { DashboardSummary } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { RefreshCw, PlusCircle } from 'lucide-react';
+import { formatLocalDate } from '../dateUtils';
 
 interface OwnerDashboardViewProps {
   onNavigate: (tab: string) => void;
@@ -42,20 +43,7 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
     return `UGX ${Math.round(val).toLocaleString()}`;
   };
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      // Split YYYY-MM-DD safely to prevent timezone shift
-      const parts = dateStr.slice(0, 10).split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
-  };
+  const formatDate = (dateStr: string) => formatLocalDate(dateStr);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10">

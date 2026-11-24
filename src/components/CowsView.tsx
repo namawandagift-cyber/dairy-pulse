@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, PlusCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import { Cow, MilkRecord } from '../types';
+import { getLocalDateKey, getTodayDateKey } from '../dateUtils';
 
-const localDate = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
+const localDate = getTodayDateKey;
 
 export const CowsView: React.FC = () => {
   const [cows, setCows] = useState<Cow[]>([]);
@@ -38,8 +36,9 @@ export const CowsView: React.FC = () => {
       const entry = all[record.cowId] || (all[record.cowId] = { total: 0, today: 0, selectedDate: 0 });
       const litres = Number(record.totalLitres || 0);
       entry.total += litres;
-      if (record.date?.slice(0, 10) === new Date().toLocaleDateString('en-CA')) entry.today += litres;
-      if (record.date?.slice(0, 10) === productionDate) entry.selectedDate += litres;
+      const recordDate = getLocalDateKey(record.date);
+      if (recordDate === getTodayDateKey()) entry.today += litres;
+      if (recordDate === productionDate) entry.selectedDate += litres;
     }
     return all;
   }, {} as Record<string, { total: number; today: number; selectedDate: number }>), [records, productionDate]);
@@ -98,7 +97,7 @@ export const CowsView: React.FC = () => {
     }
     setBusy(true); setFeedback(null);
     try {
-      const previousRecords = records.filter(record => record.cowId === cow.id && record.date?.slice(0, 10) === productionDate);
+      const previousRecords = records.filter(record => record.cowId === cow.id && getLocalDateKey(record.date) === productionDate);
       const saved = await api.createMilkRecord({ date: productionDate, morningLitres: morning, eveningLitres: evening, cowId: cow.id });
       let previousRemoved = true;
       for (const previous of previousRecords) {
@@ -146,7 +145,7 @@ export const CowsView: React.FC = () => {
       <table className="w-full min-w-[740px] text-left text-sm"><thead className="bg-stone-50 text-stone-600 text-xs uppercase"><tr><th className="p-3">Cow</th><th className="p-3">Morning (L)</th><th className="p-3">Evening (L)</th><th className="p-3">Total (L)</th><th className="p-3">Selected date</th><th className="p-3">All recorded</th><th className="p-3">Action</th></tr></thead>
         <tbody className="divide-y divide-stone-100">{cows.map(cow => {
           const input = milkInputs[cow.id] || { morning: '', evening: '' };
-          const dayRecords = records.filter(record => record.cowId === cow.id && record.date?.slice(0, 10) === productionDate);
+          const dayRecords = records.filter(record => record.cowId === cow.id && getLocalDateKey(record.date) === productionDate);
           const savedMorning = dayRecords.reduce((total, record) => total + (Number(record.morningLitres) || 0), 0);
           const savedEvening = dayRecords.reduce((total, record) => total + (Number(record.eveningLitres) || 0), 0);
           const savedTotal = dayRecords.reduce((total, record) => total + (Number(record.totalLitres) || 0), 0);
