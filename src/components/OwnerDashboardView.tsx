@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DashboardSummary } from '../types';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { RefreshCw, PlusCircle } from 'lucide-react';
-import { formatLocalDate } from '../dateUtils';
+import { formatLocalDate, getLocalDateKey } from '../dateUtils';
 
 interface OwnerDashboardViewProps {
   onNavigate: (tab: string) => void;
@@ -31,6 +31,18 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
   useEffect(() => {
     fetchSummary();
   }, []);
+
+  const recentMilkDays = useMemo(() => {
+    const days: Record<string, { date: string; morning: number; evening: number }> = {};
+    (summary?.recentMilkRecords || []).filter(record => record.cowId).forEach(record => {
+      const date = getLocalDateKey(record.date);
+      if (!date) return;
+      const day = days[date] || (days[date] = { date, morning: 0, evening: 0 });
+      day.morning += Number(record.morningLitres) || 0;
+      day.evening += Number(record.eveningLitres) || 0;
+    });
+    return Object.values(days).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  }, [summary]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -141,14 +153,6 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
           <div className="mt-8 flex flex-wrap gap-2.5">
             <button
               type="button"
-              onClick={() => onNavigate('milk')}
-              className="inline-flex items-center text-xs font-semibold bg-[#1b4332] text-white px-3.5 py-2 rounded-md hover:bg-[#2d6a4f] transition-colors"
-            >
-              <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-              Record Milk
-            </button>
-            <button
-              type="button"
               onClick={() => onNavigate('sales')}
               className="inline-flex items-center text-xs font-semibold bg-stone-100 text-stone-800 border border-stone-300 px-3.5 py-2 rounded-md hover:bg-stone-200 transition-colors"
             >
@@ -191,25 +195,18 @@ export const OwnerDashboardView: React.FC<OwnerDashboardViewProps> = ({ onNaviga
               </button>
             </div>
 
-            {!summary || !summary.recentMilkRecords || summary.recentMilkRecords.length === 0 ? (
+            {recentMilkDays.length === 0 ? (
               <div className="bg-white border border-stone-200 rounded-lg p-8 text-center text-sm text-stone-500">
-                No milk records yet. Click "Record Milk" to add your farm's first record.
+                No cow milk records yet. Add daily production from Cow Production.
               </div>
             ) : (
               <div className="bg-white border border-stone-200 rounded-lg divide-y divide-stone-100 overflow-hidden">
-                {summary.recentMilkRecords.map((rec) => (
-                  <div key={rec.id} className="p-4 flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-stone-900 text-sm">
-                        {formatDate(rec.date)} —{' '}
-                        <span className="text-[#1b4332] font-bold">{rec.totalLitres} L</span>
-                      </div>
-                      <div className="text-xs text-stone-500 mt-0.5">
-                        Morning: {rec.morningLitres} L • Evening: {rec.eveningLitres} L
-                        {rec.recordedBy ? ` • Recorded by ${rec.recordedBy}` : ''}
-                        {rec.notes ? ` • "${rec.notes}"` : ''}
-                      </div>
-                    </div>
+                {recentMilkDays.map((day) => (
+                  <div key={day.date} className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                    <div className="font-semibold text-stone-900">{formatDate(day.date)}</div>
+                    <div className="text-stone-600">Morning: {day.morning.toLocaleString()} L</div>
+                    <div className="text-stone-600">Evening: {day.evening.toLocaleString()} L</div>
+                    <div className="font-bold text-[#1b4332]">Total: {(day.morning + day.evening).toLocaleString()} L</div>
                   </div>
                 ))}
               </div>
